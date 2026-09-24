@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FormWheel_Edit</title>
+<style>
+:root{--bg:#f5f6fa;--panel:#fff;--line:#e5e7eb;--text:#17181c;--muted:#70747d;--accent:#5b5cf0;--accent2:#8b5cf6;--danger:#ef4444}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+header{height:64px;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;gap:18px;position:sticky;top:0;z-index:20}
+.logo{font-weight:900;font-size:22px;letter-spacing:-1px;cursor:pointer}.logo span{color:var(--accent)}
+.top{margin-left:auto;display:flex;gap:8px;align-items:center}button,.fileBtn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700;color:var(--text)}button:hover,.fileBtn:hover{border-color:#c9cbd2;background:#fafafa}.primary{background:var(--accent);border-color:var(--accent);color:#fff}.danger{color:var(--danger)}
+input[type=file]{display:none}
+.app{display:grid;grid-template-columns:250px minmax(500px,1fr) 300px;min-height:calc(100vh - 64px)}
+aside{background:#fff;border-right:1px solid var(--line);padding:14px}.right{border-left:1px solid var(--line);border-right:0}
+.tool{display:flex;gap:10px;align-items:center;width:100%;margin-bottom:7px;text-align:left;background:#fff}.tool.active{background:#eef0ff;border-color:#dfe1ff;color:#4f46e5}
+.sectionTitle{font-size:11px;font-weight:900;color:#999;text-transform:uppercase;margin:16px 8px 8px}
+.workspace{padding:18px;min-width:0}.stageWrap{background:#17181c;border-radius:16px;min-height:460px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+canvas{max-width:100%;max-height:65vh;box-shadow:0 10px 40px #0008;background:#222}
+.empty{color:#aaa;text-align:center;padding:60px}.empty b{display:block;color:#fff;font-size:18px;margin-bottom:7px}
+.timeline{background:#fff;border:1px solid var(--line);border-radius:14px;margin-top:14px;padding:12px}.track{display:flex;gap:8px;overflow-x:auto;min-height:86px}.clip{min-width:140px;height:76px;border:2px solid transparent;border-radius:9px;background:#f1f2f5;overflow:hidden;position:relative;cursor:pointer}.clip.active{border-color:var(--accent)}.clip video,.clip img{width:100%;height:100%;object-fit:cover}.clip .label{position:absolute;bottom:3px;left:4px;background:#000b;color:#fff;border-radius:5px;padding:2px 5px;font-size:10px}
+.controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.controls input[type=range]{width:120px}.row{display:flex;align-items:center;gap:8px;margin:9px 0}.row label{width:85px;font-size:12px;font-weight:700;color:#555}.row input,.row select,.row textarea{flex:1;min-width:0}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}.panel h3{font-size:14px;margin:0 0 12px}.small{font-size:11px;color:var(--muted)}.presetGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.preset{padding:8px;font-size:11px}.assetList{display:grid;grid-template-columns:1fr 1fr;gap:6px}.asset{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:12px}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#17181c;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:99}
+@media(max-width:1000px){.app{grid-template-columns:190px 1fr}.right{display:none}}@media(max-width:700px){.app{display:block}.app>aside{display:none}.workspace{padding:9px}.stageWrap{min-height:300px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" onclick="location.href='https://semicolonxss.github.io/Formwheel/'">Form<span>Wheel</span>_Edit</div>
+  <div class="top">
+    <label class="fileBtn">＋ 미디어 추가<input id="mediaInput" type="file" accept="video/*,image/*" multiple></label>
+    <button onclick="saveProject()">프로젝트 저장</button>
+    <button class="primary" onclick="exportVideo()">내보내기</button>
+  </div>
+</header>
+
+<div class="app">
+<aside>
+  <div class="sectionTitle">미디어</div>
+  <button class="tool active" data-tool="media">🎬 미디어</button>
+  <button class="tool" data-tool="text">🔤 텍스트</button>
+  <button class="tool" data-tool="sticker">😊 스티커</button>
+  <button class="tool" data-tool="music">🎵 음악</button>
+  <button class="tool" data-tool="effect">✨ 효과</button>
+  <button class="tool" data-tool="filter">🎨 필터</button>
+  <button class="tool" data-tool="transition">↔️ 전환</button>
+  <button class="tool" data-tool="voice">🎙️ 내레이션</button>
+  <div class="sectionTitle">편집</div>
+  <button class="tool" onclick="splitClip()">✂️ 자르기</button>
+  <button class="tool" onclick="deleteClip()">🗑️ 삭제</button>
+  <button class="tool" onclick="duplicateClip()">⧉ 복제</button>
+  <button class="tool" onclick="moveClip(-1)">◀ 순서 앞으로</button>
+  <button class="tool" onclick="moveClip(1)">▶ 순서 뒤로</button>
+</aside>
+
+<main class="workspace">
+  <div class="stageWrap">
+    <canvas id="canvas" width="720" height="1280"></canvas>
+    <div id="empty" class="empty"><b>FormWheel_Edit</b>영상을 추가해서 편집을 시작하세요.</div>
+  </div>
+  <div class="controls">
+    <button onclick="togglePlay()">▶ / ⏸ 재생</button>
+    <button onclick="setCanvas('9:16')">세로 9:16</button><button onclick="setCanvas('16:9')">가로 16:9</button><button onclick="setCanvas('1:1')">정방형 1:1</button>
+    <button onclick="rotateCanvas()">↻ 회전</button>
+    <span class="small" id="timeLabel">00:00 / 00:00</span>
+  </div>
+  <div class="timeline">
+    <div class="small">타임라인 · 선택한 클립을 아래에서 편집하세요.</div>
+    <div id="track" class="track"></div>
+  </div>
+</main>
+
+<aside class="right">
+  <div id="inspector"></div>
+</aside>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const state={clips:[],selected:-1,playing:false,raf:null,canvasW:720,canvasH:1280,rotation:0,objects:[],audios:[],projectName:"FormWheel_Edit"};
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const mediaInput=document.getElementById('mediaInput');
+
+function toast(s){const e=document.getElementById('toast');e.textContent=s;e.style.display='block';clearTimeout(window.tt);window.tt=setTimeout(()=>e.style.display='none',1800)}
+function uid(){return Math.random().toString(36).slice(2,10)}
+function fmt(s){s=Math.max(0,s||0);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0')}
+function selected(){return state.clips[state.selected]}
+function renderTrack(){const t=document.getElementById('track');t.innerHTML='';state.clips.forEach((c,i)=>{const d=document.createElement('div');d.className='clip '+(i===state.selected?'active':'');d.onclick=()=>selectClip(i);if(c.type==='video'){const v=document.createElement('video');v.src=c.url;v.muted=true;v.currentTime=0.1;d.appendChild(v)}else{const im=document.createElement('img');im.src=c.url;d.appendChild(im)}const l=document.createElement('div');l.className='label';l.textContent=(i+1)+'. '+c.name;d.appendChild(l);t.appendChild(d)})}
+function selectClip(i){state.selected=i;renderTrack();draw();showInspector('media')}
+mediaInput.onchange=e=>[...e.target.files].forEach(file=>{const url=URL.createObjectURL(file);if(file.type.startsWith('video/')){const v=document.createElement('video');v.src=url;v.preload='metadata';v.onloadedmetadata=()=>{state.clips.push({id:uid(),type:'video',name:file.name,url,duration:v.duration,start:0,end:v.duration,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5,muted:false});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}}else{state.clips.push({id:uid(),type:'image',name:file.name,url,duration:5,start:0,end:5,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}});toast('미디어를 추가했습니다.')
+
+function getFilter(c){let f=`brightness(${100+c.brightness}%) contrast(${c.contrast+100}%) saturate(${c.saturation}%)`;if(c.filter==='mono')f+=' grayscale(1)';if(c.filter==='sepia')f+=' sepia(.8)';if(c.filter==='vintage')f+=' saturate(1.3) contrast(1.1) sepia(.25)';if(c.filter==='cool')f+=' hue-rotate(20deg)';if(c.filter==='warm')f+=' sepia(.2) saturate(1.4)';return f}
+function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);if(!state.clips.length){document.getElementById('empty').style.display='block';return}document.getElementById('empty').style.display='none';const c=selected();if(!c)return;let img=null;if(c.type==='image'){img=new Image();img.onload=()=>drawImage(img,c);img.src=c.url}else{img=document.createElement('video');img.src=c.url;img.muted=true;img.currentTime=c.start||0;img.onloadeddata=()=>drawImage(img,c);img.onseeked=()=>drawImage(img,c)}}
+function drawImage(img,c){ctx.save();ctx.filter=getFilter(c);ctx.translate(canvas.width*c.x,canvas.height*c.y);ctx.rotate((c.rotation||0)*Math.PI/180);let w=canvas.width*c.scale,h=w*(img.videoHeight||img.naturalHeight||canvas.height)/(img.videoWidth||img.naturalWidth||canvas.width);if(h>canvas.height*c.scale*1.4){h=canvas.height*c.scale;w=h*(img.videoWidth||img.naturalWidth||canvas.width)/(img.videoHeight||img.naturalHeight||canvas.height)}ctx.drawImage(img,-w/2,-h/2,w,h);ctx.restore();drawObjects()}
+function drawObjects(){state.objects.forEach(o=>{ctx.save();ctx.globalAlpha=o.opacity??1;ctx.translate(o.x*canvas.width,o.y*canvas.height);ctx.rotate((o.rotate||0)*Math.PI/180);ctx.font=`${o.size||60}px ${o.font||'sans-serif'}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=o.color||'#fff';if(o.shadow){ctx.shadowColor='#000';ctx.shadowBlur=8}if(o.type==='text')ctx.fillText(o.text,0,0);else ctx.fillText(o.char,0,0);ctx.restore()})}
+function setCanvas(r){if(r==='9:16'){canvas.width=720;canvas.height=1280}else if(r==='16:9'){canvas.width=1280;canvas.height=720}else{canvas.width=900;canvas.height=900}state.canvasW=canvas.width;state.canvasH=canvas.height;draw()}
+function rotateCanvas(){const w=canvas.width;canvas.width=canvas.height;canvas.height=w;draw()}
+function togglePlay(){const c=selected();if(!c)return;if(c.type!=='video'){toast('영상 클립을 선택하세요.');return}const v=document.createElement('video');v.src=c.url;v.currentTime=c.start;v.muted=true;v.play();state.playing=true;function loop(){if(!state.playing)return;if(v.currentTime>=c.end){state.playing=false;return}drawVideoFrame(v,c);document.getElementById('timeLabel').textContent=fmt(v.currentTime-c.start)+' / '+fmt(c.end-c.start);requestAnimationFrame(loop)}loop();window.previewVideo=v}
+function drawVideoFrame(v,c){ctx.clearRect(0,0,canvas.width,canvas.height);drawImage(v,c)}
+function splitClip(){const c=selected();if(!c)return;const mid=(c.start+c.end)/2;if(mid<=c.start+.05||mid>=c.end-.05)return;const a={...c,id:uid(),end:mid,name:c.name+' (A)'},b={...c,id:uid(),start:mid,name:c.name+' (B)'};state.clips.splice(state.selected,1,a,b);renderTrack();selectClip(state.selected);toast('클립을 두 개로 나눴습니다.')}
+function deleteClip(){if(state.selected<0)return;state.clips.splice(state.selected,1);state.selected=Math.min(state.selected,state.clips.length-1);renderTrack();draw();showInspector('media')}
+function duplicateClip(){const c=selected();if(!c)return;state.clips.splice(state.selected+1,0,{...c,id:uid(),name:c.name+' 복사'});renderTrack()}
+function moveClip(dir){let i=state.selected,j=i+dir;if(i<0||j<0||j>=state.clips.length)return;[state.clips[i],state.clips[j]]=[state.clips[j],state.clips[i]];state.selected=j;renderTrack()}
+function setVal(prop,val){const c=selected();if(!c)return;c[prop]=val;draw()}
+function showInspector(tool){const p=document.getElementById('inspector');const c=selected();let h='';
+if(tool==='media'||!tool){h=`<div class="panel"><h3>🎬 클립 편집</h3>${c?`
+<div class="row"><label>시작</label><input id="start" type="number" min="0" step=".1" value="${c.start}" oninput="setVal('start',+this.value)"></div>
+<div class="row"><label>끝</label><input type="number" min="0" step=".1" value="${c.end}" oninput="setVal('end',+this.value)"></div>
+<div class="row"><label>배속</label><select onchange="setVal('speed',+this.value)">${[.1,.25,.5,1,1.5,2,3,5,10].map(x=>`<option ${c.speed==x?'selected':''} value="${x}">${x}x</option>`).join('')}</select></div>
+<div class="row"><label>음량</label><input type="range" min="0" max="1" step=".01" value="${c.volume}" oninput="setVal('volume',+this.value)"></div>
+<div class="row"><label>확대</label><input type="range" min=".2" max="2" step=".01" value="${c.scale}" oninput="setVal('scale',+this.value)"></div>
+<div class="row"><label>회전</label><input type="range" min="-180" max="180" value="${c.rotation}" oninput="setVal('rotation',+this.value)"></div>
+<div class="row"><label>배경색</label><input type="color" value="#222222" onchange="document.querySelector('.stageWrap').style.background=this.value"></div>
+`:'<div class="small">타임라인에서 클립을 선택하세요.</div>'}</div>`}
+else if(tool==='filter'){h=`<div class="panel"><h3>🎨 필터 / 색감</h3><div class="presetGrid">${[['none','원본'],['mono','흑백'],['sepia','세피아'],['vintage','빈티지'],['cool','쿨'],['warm','웜']].map(x=>`<button class="preset" onclick="setVal('filter','${x[0]}');showInspector('filter')">${x[1]}</button>`).join('')}</div>${c?`<div class="row"><label>밝기</label><input type="range" min="-100" max="100" value="${c.brightness}" oninput="setVal('brightness',+this.value)"></div><div class="row"><label>대비</label><input type="range" min="-100" max="100" value="${c.contrast}" oninput="setVal('contrast',+this.value)"></div><div class="row"><label>채도</label><input type="range" min="0" max="250" value="${c.saturation}" oninput="setVal('saturation',+this.value)"></div>`:''}</div>`}
+else if(tool==='text'){h=`<div class="panel"><h3>🔤 텍스트 템플릿</h3><input id="txt" placeholder="텍스트 입력" style="width:100%;padding:9px"><div class="presetGrid" style="margin-top:8px">${['심플','예능','브이로그','타이틀','강조','자막','날짜','레트로'].map((x,i)=>`<button class="preset" onclick="addText('${x}',document.getElementById('txt').value||'텍스트')">${x}</button>`).join('')}</div><div class="row"><label>크기</label><input id="txtSize" type="range" min="20" max="160" value="60"></div><div class="row"><label>색상</label><input id="txtColor" type="color" value="#ffffff"></div></div>`}
+else if(tool==='sticker'){h=`<div class="panel"><h3>😊 스티커</h3><div class="assetList">${['😂','❤️','🔥','✨','👍','😎','💥','🎉','⭐','😱','🤣','🎵'].map(x=>`<button class="asset" onclick="addSticker('${x}')">${x}</button>`).join('')}</div><p class="small">사용자 이미지는 미디어 추가로 올린 뒤 오버레이 기능으로 확장할 수 있습니다.</p></div>`}
+else if(tool==='effect'){h=`<div class="panel"><h3>✨ 효과</h3><div class="presetGrid">${['글리치','빈티지','노이즈','줌','플래시','흔들림'].map(x=>`<button class="preset" onclick="toast('${x} 효과를 적용할 준비가 되었습니다.')">${x}</button>`).join('')}</div><p class="small">브라우저 기본 Canvas 기반 효과를 사용합니다.</p></div>`}
+else if(tool==='transition'){h=`<div class="panel"><h3>↔️ 전환</h3><div class="presetGrid">${['디졸브','페이드','왼쪽 와이프','오른쪽 와이프','줌','플래시'].map(x=>`<button class="preset" onclick="toast('${x} 전환 선택')">${x}</button>`).join('')}</div><div class="row"><label>속도</label><input type="range" min=".1" max="2" step=".1" value=".5"></div></div>`}
+else if(tool==='music'){h=`<div class="panel"><h3>🎵 음악 / 오디오</h3><label class="fileBtn" style="display:block;text-align:center">오디오 파일 추가<input type="file" accept="audio/*" multiple onchange="addAudio(this.files)"></label><p class="small">내 기기의 음악을 추가하고 볼륨을 조절할 수 있습니다. 저작권이 있는 음원은 사용 권한을 확인하세요.</p><div id="audioList"></div></div>`}
+else if(tool==='voice'){h=`<div class="panel"><h3>🎙️ 내레이션</h3><button class="primary" onclick="recordVoice()">● 녹음 시작</button> <button onclick="stopVoice()">■ 정지</button><p id="recState" class="small">마이크 권한이 필요합니다.</p></div>`}
+p.innerHTML=h}
+document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tool[data-tool]').forEach(x=>x.classList.remove('active'));b.classList.add('active');showInspector(b.dataset.tool)})
+function addText(style,text){const colors={심플:'#fff',예능:'#ffea00',브이로그:'#fff',타이틀:'#fff',강조:'#ff4d4d',자막:'#fff',날짜:'#fff',레트로:'#ffb000'};state.objects.push({type:'text',text,x:.5,y:.8,size:+document.getElementById('txtSize').value||60,color:document.getElementById('txtColor').value||colors[style],font:style==='예능'?'Arial Black':'sans-serif',shadow:true});draw();toast(style+' 텍스트 추가')}
+function addSticker(char){state.objects.push({type:'sticker',char,x:.5,y:.5,size:90});draw()}
+function addAudio(files){[...files].forEach(f=>state.audios.push({name:f.name,url:URL.createObjectURL(f),volume:1}));showInspector('music');toast('오디오를 추가했습니다.')}
+let recorder,chunks=[];
+async function recordVoice(){try{const s=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(s);chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=()=>{const blob=new Blob(chunks,{type:'audio/webm'});state.audios.push({name:'내레이션',url:URL.createObjectURL(blob),volume:1});showInspector('voice');toast('내레이션이 추가되었습니다.');s.getTracks().forEach(t=>t.stop())};recorder.start();document.getElementById('recState').textContent='녹음 중...';}catch(e){toast('마이크 권한을 확인하세요.')}}
+function stopVoice(){if(recorder&&recorder.state!=='inactive')recorder.stop()}
+function saveProject(){const data={clips:state.clips.map(c=>({...c,url:undefined})),objects:state.objects,audios:state.audios.map(a=>({name:a.name,volume:a.volume})),canvasW:canvas.width,canvasH:canvas.height};localStorage.setItem('FormWheel_Edit_project',JSON.stringify(data));toast('프로젝트 설정을 저장했습니다.')}
+async function exportVideo(){if(!state.clips.length){toast('먼저 영상을 추가하세요.');return}toast('현재 편집 화면을 WebM으로 녹화합니다.');const stream=canvas.captureStream(30);const rec=new MediaRecorder(stream,{mimeType:'video/webm'});const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='FormWheel_Edit.webm';a.click();toast('내보내기가 완료되었습니다.')} ;rec.start();let i=0;const end=Date.now()+Math.min(10000,(selected()?.end-selected()?.start||5)*1000);function tick(){if(Date.now()<end){draw();requestAnimationFrame(tick)}else rec.stop()}tick()}
+showInspector('media');draw();
+</script>
+</body>
+</html>
