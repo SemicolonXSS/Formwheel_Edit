@@ -28,7 +28,7 @@ canvas{max-width:100%;max-height:65vh;box-shadow:0 10px 40px #0008;background:#2
   <div class="logo" onclick="location.href='https://semicolonxss.github.io/Formwheel/'">Form<span>Wheel</span>_Edit</div>
   <div class="top">
     <label class="fileBtn">＋ 미디어 추가<input id="mediaInput" type="file" accept="video/*,image/*" multiple></label>
-    <button onclick="saveProject()">프로젝트 저장</button>
+    <button onclick="saveProject()">프로젝트 저장</button><button onclick="loadProject()">저장 프로젝트 열기</button>
     <button class="primary" onclick="exportVideo()">내보내기</button>
   </div>
 </header>
@@ -86,7 +86,7 @@ function fmt(s){s=Math.max(0,s||0);return String(Math.floor(s/60)).padStart(2,'0
 function selected(){return state.clips[state.selected]}
 function renderTrack(){const t=document.getElementById('track');t.innerHTML='';state.clips.forEach((c,i)=>{const d=document.createElement('div');d.className='clip '+(i===state.selected?'active':'');d.onclick=()=>selectClip(i);if(c.type==='video'){const v=document.createElement('video');v.src=c.url;v.muted=true;v.currentTime=0.1;d.appendChild(v)}else{const im=document.createElement('img');im.src=c.url;d.appendChild(im)}const l=document.createElement('div');l.className='label';l.textContent=(i+1)+'. '+c.name;d.appendChild(l);t.appendChild(d)})}
 function selectClip(i){state.selected=i;renderTrack();draw();showInspector('media')}
-mediaInput.onchange=e=>[...e.target.files].forEach(file=>{const url=URL.createObjectURL(file);if(file.type.startsWith('video/')){const v=document.createElement('video');v.src=url;v.preload='metadata';v.onloadedmetadata=()=>{state.clips.push({id:uid(),type:'video',name:file.name,url,duration:v.duration,start:0,end:v.duration,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5,muted:false});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}}else{state.clips.push({id:uid(),type:'image',name:file.name,url,duration:5,start:0,end:5,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}});toast('미디어를 추가했습니다.')
+mediaInput.onchange=e=>[...e.target.files].forEach(file=>{const url=URL.createObjectURL(file);if(file.type.startsWith('video/')){const v=document.createElement('video');v.src=url;v.preload='metadata';v.onloadedmetadata=()=>{state.clips.push({id:uid(),type:'video',name:file.name,url,blob:file,duration:v.duration,start:0,end:v.duration,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5,muted:false});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}}else{state.clips.push({id:uid(),type:'image',name:file.name,url,blob:file,duration:5,start:0,end:5,speed:1,volume:1,filter:'none',brightness:0,contrast:0,saturation:100,rotation:0,scale:1,x:.5,y:.5});if(state.selected<0)state.selected=0;renderTrack();draw();showInspector('media')}});toast('미디어를 추가했습니다.')
 
 function getFilter(c){let f=`brightness(${100+c.brightness}%) contrast(${c.contrast+100}%) saturate(${c.saturation}%)`;if(c.filter==='mono')f+=' grayscale(1)';if(c.filter==='sepia')f+=' sepia(.8)';if(c.filter==='vintage')f+=' saturate(1.3) contrast(1.1) sepia(.25)';if(c.filter==='cool')f+=' hue-rotate(20deg)';if(c.filter==='warm')f+=' sepia(.2) saturate(1.4)';return f}
 function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);if(!state.clips.length){document.getElementById('empty').style.display='block';return}document.getElementById('empty').style.display='none';const c=selected();if(!c)return;let img=null;if(c.type==='image'){img=new Image();img.onload=()=>drawImage(img,c);img.src=c.url}else{img=document.createElement('video');img.src=c.url;img.muted=true;img.currentTime=c.start||0;img.onloadeddata=()=>drawImage(img,c);img.onseeked=()=>drawImage(img,c)}}
@@ -94,10 +94,11 @@ function drawImage(img,c){ctx.save();ctx.filter=getFilter(c);ctx.translate(canva
 function drawObjects(){state.objects.forEach(o=>{ctx.save();ctx.globalAlpha=o.opacity??1;ctx.translate(o.x*canvas.width,o.y*canvas.height);ctx.rotate((o.rotate||0)*Math.PI/180);ctx.font=`${o.size||60}px ${o.font||'sans-serif'}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=o.color||'#fff';if(o.shadow){ctx.shadowColor='#000';ctx.shadowBlur=8}if(o.type==='text')ctx.fillText(o.text,0,0);else ctx.fillText(o.char,0,0);ctx.restore()})}
 function setCanvas(r){if(r==='9:16'){canvas.width=720;canvas.height=1280}else if(r==='16:9'){canvas.width=1280;canvas.height=720}else{canvas.width=900;canvas.height=900}state.canvasW=canvas.width;state.canvasH=canvas.height;draw()}
 function rotateCanvas(){const w=canvas.width;canvas.width=canvas.height;canvas.height=w;draw()}
-function togglePlay(){const c=selected();if(!c)return;if(c.type!=='video'){toast('영상 클립을 선택하세요.');return}const v=document.createElement('video');v.src=c.url;v.currentTime=c.start;v.muted=true;v.play();state.playing=true;function loop(){if(!state.playing)return;if(v.currentTime>=c.end){state.playing=false;return}drawVideoFrame(v,c);document.getElementById('timeLabel').textContent=fmt(v.currentTime-c.start)+' / '+fmt(c.end-c.start);requestAnimationFrame(loop)}loop();window.previewVideo=v}
+function togglePlay(){if(exporting)return toast('내보내기 중입니다.');if(state.playing){stopTimeline();return;}playTimeline().catch(error=>{stopTimeline();toast(error.message);});}
+
 function drawVideoFrame(v,c){ctx.clearRect(0,0,canvas.width,canvas.height);drawImage(v,c)}
 function splitClip(){const c=selected();if(!c)return;const mid=(c.start+c.end)/2;if(mid<=c.start+.05||mid>=c.end-.05)return;const a={...c,id:uid(),end:mid,name:c.name+' (A)'},b={...c,id:uid(),start:mid,name:c.name+' (B)'};state.clips.splice(state.selected,1,a,b);renderTrack();selectClip(state.selected);toast('클립을 두 개로 나눴습니다.')}
-function deleteClip(){if(state.selected<0)return;state.clips.splice(state.selected,1);state.selected=Math.min(state.selected,state.clips.length-1);renderTrack();draw();showInspector('media')}
+function deleteClip(){if(state.selected<0)return;stopTimeline();const [removed]=state.clips.splice(state.selected,1);releaseClip(removed);state.selected=Math.min(state.selected,state.clips.length-1);renderTrack();draw();showInspector('media')}
 function duplicateClip(){const c=selected();if(!c)return;state.clips.splice(state.selected+1,0,{...c,id:uid(),name:c.name+' 복사'});renderTrack()}
 function moveClip(dir){let i=state.selected,j=i+dir;if(i<0||j<0||j>=state.clips.length)return;[state.clips[i],state.clips[j]]=[state.clips[j],state.clips[i]];state.selected=j;renderTrack()}
 function setVal(prop,val){const c=selected();if(!c)return;c[prop]=val;draw()}
@@ -122,13 +123,81 @@ p.innerHTML=h}
 document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tool[data-tool]').forEach(x=>x.classList.remove('active'));b.classList.add('active');showInspector(b.dataset.tool)})
 function addText(style,text){const colors={심플:'#fff',예능:'#ffea00',브이로그:'#fff',타이틀:'#fff',강조:'#ff4d4d',자막:'#fff',날짜:'#fff',레트로:'#ffb000'};state.objects.push({type:'text',text,x:.5,y:.8,size:+document.getElementById('txtSize').value||60,color:document.getElementById('txtColor').value||colors[style],font:style==='예능'?'Arial Black':'sans-serif',shadow:true});draw();toast(style+' 텍스트 추가')}
 function addSticker(char){state.objects.push({type:'sticker',char,x:.5,y:.5,size:90});draw()}
-function addAudio(files){[...files].forEach(f=>state.audios.push({name:f.name,url:URL.createObjectURL(f),volume:1}));showInspector('music');toast('오디오를 추가했습니다.')}
+function addAudio(files){[...files].forEach(f=>state.audios.push({id:uid(),name:f.name,url:URL.createObjectURL(f),blob:f,volume:1}));showInspector('music');toast('오디오를 추가했습니다.')}
 let recorder,chunks=[];
-async function recordVoice(){try{const s=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(s);chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=()=>{const blob=new Blob(chunks,{type:'audio/webm'});state.audios.push({name:'내레이션',url:URL.createObjectURL(blob),volume:1});showInspector('voice');toast('내레이션이 추가되었습니다.');s.getTracks().forEach(t=>t.stop())};recorder.start();document.getElementById('recState').textContent='녹음 중...';}catch(e){toast('마이크 권한을 확인하세요.')}}
+async function recordVoice(){try{const s=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(s);chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=()=>{const blob=new Blob(chunks,{type:'audio/webm'});state.audios.push({id:uid(),name:'내레이션',url:URL.createObjectURL(blob),blob,volume:1});showInspector('voice');toast('내레이션이 추가되었습니다.');s.getTracks().forEach(t=>t.stop())};recorder.start();document.getElementById('recState').textContent='녹음 중...';}catch(e){toast('마이크 권한을 확인하세요.')}}
 function stopVoice(){if(recorder&&recorder.state!=='inactive')recorder.stop()}
-function saveProject(){const data={clips:state.clips.map(c=>({...c,url:undefined})),objects:state.objects,audios:state.audios.map(a=>({name:a.name,volume:a.volume})),canvasW:canvas.width,canvasH:canvas.height};localStorage.setItem('FormWheel_Edit_project',JSON.stringify(data));toast('프로젝트 설정을 저장했습니다.')}
-async function exportVideo(){if(!state.clips.length){toast('먼저 영상을 추가하세요.');return}toast('현재 편집 화면을 WebM으로 녹화합니다.');const stream=canvas.captureStream(30);const rec=new MediaRecorder(stream,{mimeType:'video/webm'});const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);rec.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));a.download='FormWheel_Edit.webm';a.click();toast('내보내기가 완료되었습니다.')} ;rec.start();let i=0;const end=Date.now()+Math.min(10000,(selected()?.end-selected()?.start||5)*1000);function tick(){if(Date.now()<end){draw();requestAnimationFrame(tick)}else rec.stop()}tick()}
+const mediaCache=new Map(),audioNodes=new WeakMap();let editAudio=null,timelineToken=0,exporting=false;
+function clipDuration(c){return Math.max(0,(Number(c.end)-Number(c.start))/Math.max(.1,Number(c.speed)||1));}
+function timelinePosition(clips,seconds){let offset=0;for(let i=0;i<clips.length;i++){const duration=clipDuration(clips[i]);if(seconds<offset+duration)return {index:i,sourceTime:Number(clips[i].start)+(seconds-offset)*Math.max(.1,Number(clips[i].speed)||1)};offset+=duration;}return null;}
+function totalDuration(){return state.clips.reduce((sum,c)=>sum+clipDuration(c),0);}
+function ensureEditAudio(){editAudio=editAudio||new AudioContext();editAudio.resume();return editAudio;}
+async function mediaFor(c,audio=false){
+ const key=(audio?'audio:':'clip:')+(c.id||c.url);if(mediaCache.has(key))return mediaCache.get(key);
+ const el=document.createElement(audio?'audio':c.type==='video'?'video':'img');el.src=c.url;
+ if(el.tagName!=='IMG'){el.preload='auto';el.playsInline=true;await new Promise((resolve,reject)=>{if(el.readyState>=2)return resolve();el.onloadeddata=resolve;el.onerror=()=>reject(Error('미디어를 읽을 수 없습니다: '+c.name));});}
+ else await new Promise((resolve,reject)=>{if(el.complete&&el.naturalWidth)return resolve();el.onload=resolve;el.onerror=()=>reject(Error('이미지를 읽을 수 없습니다: '+c.name));});
+ mediaCache.set(key,el);return el;
+}
+function routeAudio(el,volume,destination){
+ const context=ensureEditAudio();let nodes=audioNodes.get(el);
+ if(!nodes){const source=context.createMediaElementSource(el),gain=context.createGain();source.connect(gain);nodes={source,gain};audioNodes.set(el,nodes);}
+ nodes.gain.disconnect();nodes.gain.gain.value=Math.max(0,Math.min(1,Number(volume)||0));nodes.gain.connect(destination||context.destination);
+}
+function stopTimeline(){state.playing=false;timelineToken++;if(state.raf)cancelAnimationFrame(state.raf);state.raf=null;for(const el of mediaCache.values())if(el.pause)el.pause();}
+async function seekMedia(el,time){if(Math.abs(el.currentTime-time)<.02)return;await new Promise(resolve=>{el.addEventListener('seeked',resolve,{once:true});el.currentTime=Math.max(0,Math.min(time,Number.isFinite(el.duration)?Math.max(0,el.duration-.001):time));});}
+async function playTimeline(destination=null){
+ stopTimeline();if(!state.clips.length)throw Error('먼저 미디어를 추가해주세요.');
+ const token=timelineToken,context=ensureEditAudio(),total=totalDuration();
+ const clips=state.clips.slice(),elements=await Promise.all(clips.map(c=>mediaFor(c))),audios=await Promise.all(state.audios.map(a=>mediaFor(a,true)));
+ if(token!==timelineToken)return;
+ for(let i=0;i<audios.length;i++){audios[i].currentTime=0;routeAudio(audios[i],state.audios[i].volume,destination);}
+ for(let i=0;i<elements.length;i++)if(clips[i].type==='video'){await seekMedia(elements[i],clips[i].start);elements[i].playbackRate=Math.max(.1,Number(clips[i].speed)||1);routeAudio(elements[i],clips[i].muted?0:clips[i].volume,destination);}
+ state.playing=true;const started=context.currentTime;audios.forEach(el=>el.play().catch(()=>{}));let current=-1;
+ return new Promise((resolve,reject)=>{
+  function frame(){
+   if(token!==timelineToken||!state.playing){resolve();return;}
+   const elapsed=context.currentTime-started,position=timelinePosition(clips,elapsed);
+   if(!position){stopTimeline();resolve();return;}
+   const i=position.index,el=elements[i],c=clips[i];
+   if(i!==current){if(current>=0&&elements[current].pause)elements[current].pause();current=i;if(c.type==='video'){el.currentTime=position.sourceTime;el.play().catch(error=>{stopTimeline();reject(error);});}}
+   ctx.clearRect(0,0,canvas.width,canvas.height);drawImage(el,c);document.getElementById('timeLabel').textContent=fmt(elapsed)+' / '+fmt(total);
+   state.raf=requestAnimationFrame(frame);
+  }frame();
+ });
+}
+function releaseClip(c){const key='clip:'+c.id,el=mediaCache.get(key);if(el){el.pause?.();const nodes=audioNodes.get(el);nodes?.source.disconnect();nodes?.gain.disconnect();el.removeAttribute('src');el.load?.();mediaCache.delete(key);}if(!state.clips.some(x=>x.url===c.url))URL.revokeObjectURL(c.url);}
+async function projectDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open('FormWheel_Edit',1);request.onupgradeneeded=()=>request.result.createObjectStore('projects');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+async function saveProject(){
+ try{const db=await projectDB(),data={clips:state.clips.map(c=>({...c,url:undefined})),objects:state.objects,audios:state.audios.map(a=>({...a,url:undefined})),canvasW:canvas.width,canvasH:canvas.height};
+ if([...data.clips,...data.audios].some(c=>!c.blob))throw Error('원본 파일을 다시 추가한 뒤 저장해주세요.');
+ await new Promise((resolve,reject)=>{const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(data,'current');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});db.close();toast('원본 미디어와 프로젝트를 이 기기에 저장했습니다.');}catch(error){toast('저장 실패: '+error.message);}
+}
+async function loadProject(){
+ try{const db=await projectDB(),data=await new Promise((resolve,reject)=>{const request=db.transaction('projects').objectStore('projects').get('current');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});db.close();if(!data)throw Error('저장된 프로젝트가 없습니다.');
+ stopTimeline();const old=state.clips;state.clips=[];old.forEach(releaseClip);state.audios.forEach(a=>URL.revokeObjectURL(a.url));for(const el of mediaCache.values()){el.pause?.();audioNodes.get(el)?.source.disconnect();audioNodes.get(el)?.gain.disconnect();el.removeAttribute('src');el.load?.();}mediaCache.clear();
+ state.clips=data.clips.map(c=>({...c,url:URL.createObjectURL(c.blob)}));state.audios=data.audios.map(a=>({...a,url:URL.createObjectURL(a.blob)}));state.objects=data.objects;state.selected=state.clips.length?0:-1;canvas.width=data.canvasW;canvas.height=data.canvasH;renderTrack();draw();showInspector('media');toast('저장 프로젝트와 원본 미디어를 복구했습니다.');
+ }catch(error){toast('복구 실패: '+error.message);}
+}
+async function exportVideo(){
+ if(exporting)return;if(!state.clips.length)return toast('먼저 영상을 추가하세요.');
+ if(!canvas.captureStream||!window.MediaRecorder)return toast('이 브라우저는 영상 내보내기를 지원하지 않습니다.');
+ exporting=true;let stream,rec,destination;
+ const locks=[...document.querySelectorAll('button,input,select')].map(el=>({el,disabled:el.disabled}));locks.forEach(({el})=>el.disabled=true);
+ try{
+  const context=ensureEditAudio();destination=context.createMediaStreamDestination();stream=canvas.captureStream(30);destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
+  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));if(!mime)throw Error('WebM 녹화를 지원하지 않습니다.');
+  // Preload before starting the recorder so loading time is excluded from output.
+  await Promise.all([...state.clips.map(c=>mediaFor(c)),...state.audios.map(a=>mediaFor(a,true))]);
+  rec=new MediaRecorder(stream,{mimeType:mime});const parts=[];rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+  const finished=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=e=>reject(e.error||Error('녹화 실패'));});
+  toast('전체 타임라인 '+fmt(totalDuration())+' 내보내기 중 · 이 탭을 열어두세요.');rec.start(1000);await playTimeline(destination);rec.stop();await finished;
+  const url=URL.createObjectURL(new Blob(parts,{type:mime})),link=document.createElement('a');link.href=url;link.download='FormWheel_Edit.webm';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('전체 영상과 오디오 내보내기가 완료되었습니다.');
+ }catch(error){toast('내보내기 실패: '+error.message);}finally{if(rec&&rec.state!=='inactive')rec.stop();stopTimeline();stream?.getTracks().forEach(t=>t.stop());destination?.disconnect();for(const el of mediaCache.values())audioNodes.get(el)?.gain.disconnect();locks.forEach(({el,disabled})=>el.disabled=disabled);exporting=false;draw();}
+}
+addEventListener('beforeunload',()=>{stopTimeline();for(const c of [...state.clips,...state.audios])URL.revokeObjectURL(c.url);editAudio?.close();});
 showInspector('media');draw();
 </script>
 </body>
 </html>
+
