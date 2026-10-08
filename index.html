@@ -11,10 +11,11 @@
 <meta property="og:title" content="Edit · Formwheel">
 <meta property="og:description" content="콘텐츠를 만들고 편집하기 위한 FormWheel 편집 도구.">
 <meta property="og:image" content="https://semicolonxss.github.io/Formwheel_Edit/assets/thumbnail.svg">
+<link rel="stylesheet" href="assets/formwheel-brand.css?v=20261008-hub-logo">
 </head>
 <body>
 <header>
-  <div class="logo" onclick="location.href='https://semicolonxss.github.io/Formwheel/'">Form<span>Wheel</span>_Edit</div>
+  <a class="logo fw-hub-logo" aria-label="FormWheel 메인으로 이동" href="https://semicolonxss.github.io/Formwheel/"><span class="fw-hub-form">Form</span><span class="fw-hub-icon" aria-hidden="true"></span><span class="fw-hub-wheel">Wheel</span></a>
   <div class="top">
     <label class="fileBtn">＋ 미디어 추가<input id="mediaInput" type="file" accept="video/*,image/*" multiple></label>
     <button onclick="saveProject()">프로젝트 저장</button><button onclick="loadProject()">저장 프로젝트 열기</button>
