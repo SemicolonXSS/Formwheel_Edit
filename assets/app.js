@@ -1,4 +1,4 @@
-const state={clips:[],selected:-1,playing:false,raf:null,canvasW:720,canvasH:1280,rotation:0,objects:[],audios:[],projectName:"FormWheel_Edit"};
+const state={clips:[],selected:-1,playing:false,raf:null,canvasW:720,canvasH:1280,rotation:0,objects:[],audios:[],projectName:"FormWheel_Edit",selectedObject:null};
 const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
 const mediaInput=document.getElementById('mediaInput');
 
@@ -13,7 +13,7 @@ mediaInput.onchange=e=>[...e.target.files].forEach(file=>{const url=URL.createOb
 function getFilter(c){let f=`brightness(${100+c.brightness}%) contrast(${c.contrast+100}%) saturate(${c.saturation}%)`;if(c.filter==='mono')f+=' grayscale(1)';if(c.filter==='sepia')f+=' sepia(.8)';if(c.filter==='vintage')f+=' saturate(1.3) contrast(1.1) sepia(.25)';if(c.filter==='cool')f+=' hue-rotate(20deg)';if(c.filter==='warm')f+=' sepia(.2) saturate(1.4)';return f}
 function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);if(!state.clips.length){document.getElementById('empty').style.display='block';return}document.getElementById('empty').style.display='none';const c=selected();if(!c)return;let img=null;if(c.type==='image'){img=new Image();img.onload=()=>drawImage(img,c);img.src=c.url}else{img=document.createElement('video');img.src=c.url;img.muted=true;img.currentTime=c.start||0;img.onloadeddata=()=>drawImage(img,c);img.onseeked=()=>drawImage(img,c)}}
 function drawImage(img,c){ctx.save();ctx.filter=getFilter(c);ctx.translate(canvas.width*c.x,canvas.height*c.y);ctx.rotate((c.rotation||0)*Math.PI/180);let w=canvas.width*c.scale,h=w*(img.videoHeight||img.naturalHeight||canvas.height)/(img.videoWidth||img.naturalWidth||canvas.width);if(h>canvas.height*c.scale*1.4){h=canvas.height*c.scale;w=h*(img.videoWidth||img.naturalWidth||canvas.width)/(img.videoHeight||img.naturalHeight||canvas.height)}ctx.drawImage(img,-w/2,-h/2,w,h);ctx.restore();drawObjects()}
-function drawObjects(){state.objects.forEach(o=>{ctx.save();ctx.globalAlpha=o.opacity??1;ctx.translate(o.x*canvas.width,o.y*canvas.height);ctx.rotate((o.rotate||0)*Math.PI/180);ctx.font=`${o.size||60}px ${o.font||'sans-serif'}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=o.color||'#fff';if(o.shadow){ctx.shadowColor='#000';ctx.shadowBlur=8}if(o.type==='text')ctx.fillText(o.text,0,0);else ctx.fillText(o.char,0,0);ctx.restore()})}
+function drawObjects(){state.objects.forEach(o=>{ctx.save();ctx.globalAlpha=o.opacity??1;ctx.translate(o.x*canvas.width,o.y*canvas.height);ctx.rotate((o.rotate||0)*Math.PI/180);ctx.font=`${o.size||60}px ${o.font||'sans-serif'}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=o.color||'#fff';if(o.shadow){ctx.shadowColor='#000';ctx.shadowBlur=8}if(o.type==='text')ctx.fillText(o.text,0,0);else ctx.fillText(o.char,0,0);ctx.restore()});if(state.selectedObject&&!state.playing&&!exporting){const o=state.objects.find(x=>x.id===state.selectedObject);if(o){const m=objectMetrics(o);ctx.save();ctx.translate(o.x*canvas.width,o.y*canvas.height);ctx.rotate((o.rotate||0)*Math.PI/180);ctx.strokeStyle='#8b5cf6';ctx.lineWidth=Math.max(3,canvas.width/250);ctx.setLineDash([12,7]);ctx.strokeRect(-m.w/2-12,-m.h/2-12,m.w+24,m.h+24);ctx.restore()}}}
 function setCanvas(r){if(r==='9:16'){canvas.width=720;canvas.height=1280}else if(r==='16:9'){canvas.width=1280;canvas.height=720}else{canvas.width=900;canvas.height=900}state.canvasW=canvas.width;state.canvasH=canvas.height;draw()}
 function rotateCanvas(){const w=canvas.width;canvas.width=canvas.height;canvas.height=w;draw()}
 function togglePlay(){if(exporting)return toast('내보내기 중입니다.');if(state.playing){stopTimeline();return;}playTimeline().catch(error=>{stopTimeline();toast(error.message);});}
@@ -24,7 +24,21 @@ function deleteClip(){if(state.selected<0)return;stopTimeline();const [removed]=
 function duplicateClip(){const c=selected();if(!c)return;state.clips.splice(state.selected+1,0,{...c,id:uid(),name:c.name+' 복사'});renderTrack()}
 function moveClip(dir){let i=state.selected,j=i+dir;if(i<0||j<0||j>=state.clips.length)return;[state.clips[i],state.clips[j]]=[state.clips[j],state.clips[i]];state.selected=j;renderTrack()}
 function setVal(prop,val){const c=selected();if(!c)return;c[prop]=val;draw()}
+function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function objectMetrics(o){ctx.save();ctx.font=`${o.size||60}px ${o.font||'sans-serif'}`;const m=ctx.measureText(o.type==='text'?o.text:o.char);ctx.restore();return {w:Math.max(40,m.width),h:(o.size||60)*1.25}}
+function objectHit(o,x,y){const dx=(x-o.x)*canvas.width,dy=(y-o.y)*canvas.height,angle=-(o.rotate||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),localX=dx*c-dy*s,localY=dx*s+dy*c,m=objectMetrics(o);return Math.abs(localX)<=m.w/2+18&&Math.abs(localY)<=m.h/2+18}
+function pickObject(x,y){for(let i=state.objects.length-1;i>=0;i--)if(objectHit(state.objects[i],x,y))return state.objects[i];return null}
+function selectObject(id){state.selectedObject=id;draw();showInspector(id?'object':'media')}
+function deleteSelectedObject(){if(!state.selectedObject)return;state.objects=state.objects.filter(o=>o.id!==state.selectedObject);state.selectedObject=null;draw();showInspector('media');toast('선택한 요소를 삭제했습니다.')}
+function changeObject(prop,value){const o=state.objects.find(x=>x.id===state.selectedObject);if(!o)return;o[prop]=value;draw()}
+let pointerDrag=null;
+canvas.addEventListener('pointerdown',e=>{if(state.playing||exporting)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height,o=pickObject(x,y);selectObject(o?.id||null);if(o){pointerDrag={id:o.id,dx:x-o.x,dy:y-o.y};canvas.setPointerCapture(e.pointerId);e.preventDefault()}});
+canvas.addEventListener('pointermove',e=>{if(!pointerDrag)return;const o=state.objects.find(x=>x.id===pointerDrag.id);if(!o)return;const r=canvas.getBoundingClientRect();o.x=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width-pointerDrag.dx));o.y=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height-pointerDrag.dy));draw();e.preventDefault()});
+function endObjectDrag(){pointerDrag=null}
+canvas.addEventListener('pointerup',endObjectDrag);canvas.addEventListener('pointercancel',endObjectDrag);
+document.addEventListener('keydown',e=>{if(!state.selectedObject||!['Delete','Backspace'].includes(e.key)||/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)||document.activeElement?.isContentEditable)return;deleteSelectedObject()});
 function showInspector(tool){const p=document.getElementById('inspector');const c=selected();let h='';
+if(tool==='object'){const o=state.objects.find(x=>x.id===state.selectedObject);if(!o){showInspector('media');return;}h=`<div class="panel"><h3>🎯 선택한 ${o.type==='text'?'텍스트':'스티커'}</h3><p class="small">화면에서 드래그해 이동 · Delete 키로 삭제</p>${o.type==='text'?`<div class="row"><label>내용</label><input id="objectText" value="${escapeHTML(o.text)}"></div>`:''}<div class="row"><label>크기</label><input type="range" min="20" max="240" value="${o.size||60}" oninput="changeObject('size',+this.value)"></div><div class="row"><label>회전</label><input type="range" min="-180" max="180" value="${o.rotate||0}" oninput="changeObject('rotate',+this.value)"></div><div class="row"><label>투명도</label><input type="range" min="0" max="1" step=".05" value="${o.opacity??1}" oninput="changeObject('opacity',+this.value)"></div>${o.type==='text'?`<div class="row"><label>색상</label><input type="color" value="${o.color||'#ffffff'}" oninput="changeObject('color',this.value)"></div>`:''}<button class="danger" onclick="deleteSelectedObject()">🗑️ 선택 요소 삭제</button></div>`;p.innerHTML=h;const textInput=document.getElementById('objectText');if(textInput)textInput.addEventListener('input',()=>changeObject('text',textInput.value));return;}
 if(tool==='media'||!tool){h=`<div class="panel"><h3>🎬 클립 편집</h3>${c?`
 <div class="row"><label>시작</label><input id="start" type="number" min="0" step=".1" value="${c.start}" oninput="setVal('start',+this.value)"></div>
 <div class="row"><label>끝</label><input type="number" min="0" step=".1" value="${c.end}" oninput="setVal('end',+this.value)"></div>
@@ -43,8 +57,8 @@ else if(tool==='music'){h=`<div class="panel"><h3>🎵 음악 / 오디오</h3><l
 else if(tool==='voice'){h=`<div class="panel"><h3>🎙️ 내레이션</h3><button class="primary" onclick="recordVoice()">● 녹음 시작</button> <button onclick="stopVoice()">■ 정지</button><p id="recState" class="small">마이크 권한이 필요합니다.</p></div>`}
 p.innerHTML=h}
 document.querySelectorAll('.tool[data-tool]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tool[data-tool]').forEach(x=>x.classList.remove('active'));b.classList.add('active');showInspector(b.dataset.tool)})
-function addText(style,text){const colors={심플:'#fff',예능:'#ffea00',브이로그:'#fff',타이틀:'#fff',강조:'#ff4d4d',자막:'#fff',날짜:'#fff',레트로:'#ffb000'};state.objects.push({type:'text',text,x:.5,y:.8,size:+document.getElementById('txtSize').value||60,color:document.getElementById('txtColor').value||colors[style],font:style==='예능'?'Arial Black':'sans-serif',shadow:true});draw();toast(style+' 텍스트 추가')}
-function addSticker(char){state.objects.push({type:'sticker',char,x:.5,y:.5,size:90});draw()}
+function addText(style,text){const colors={심플:'#fff',예능:'#ffea00',브이로그:'#fff',타이틀:'#fff',강조:'#ff4d4d',자막:'#fff',날짜:'#fff',레트로:'#ffb000'};const id=uid();state.objects.push({id,type:'text',text,x:.5,y:.8,size:+document.getElementById('txtSize').value||60,color:document.getElementById('txtColor').value||colors[style],font:style==='예능'?'Arial Black':'sans-serif',shadow:true});selectObject(id);toast(style+' 텍스트 추가')}
+function addSticker(char){const id=uid();state.objects.push({id,type:'sticker',char,x:.5,y:.5,size:90});selectObject(id)}
 function addAudio(files){[...files].forEach(f=>state.audios.push({id:uid(),name:f.name,url:URL.createObjectURL(f),blob:f,volume:1}));showInspector('music');toast('오디오를 추가했습니다.')}
 let recorder,chunks=[];
 async function recordVoice(){try{const s=await navigator.mediaDevices.getUserMedia({audio:true});recorder=new MediaRecorder(s);chunks=[];recorder.ondataavailable=e=>chunks.push(e.data);recorder.onstop=()=>{const blob=new Blob(chunks,{type:'audio/webm'});state.audios.push({id:uid(),name:'내레이션',url:URL.createObjectURL(blob),blob,volume:1});showInspector('voice');toast('내레이션이 추가되었습니다.');s.getTracks().forEach(t=>t.stop())};recorder.start();document.getElementById('recState').textContent='녹음 중...';}catch(e){toast('마이크 권한을 확인하세요.')}}
@@ -75,7 +89,7 @@ async function playTimeline(destination=null){
  if(token!==timelineToken)return;
  for(let i=0;i<audios.length;i++){audios[i].currentTime=0;routeAudio(audios[i],state.audios[i].volume,destination);}
  for(let i=0;i<elements.length;i++)if(clips[i].type==='video'){await seekMedia(elements[i],clips[i].start);elements[i].playbackRate=Math.max(.1,Number(clips[i].speed)||1);routeAudio(elements[i],clips[i].muted?0:clips[i].volume,destination);}
- state.playing=true;const started=context.currentTime;audios.forEach(el=>el.play().catch(()=>{}));let current=-1;
+ state.playing=true;drawObjects();const started=context.currentTime;audios.forEach(el=>el.play().catch(()=>{}));let current=-1;
  return new Promise((resolve,reject)=>{
   function frame(){
    if(token!==timelineToken||!state.playing){resolve();return;}
@@ -98,13 +112,13 @@ async function saveProject(){
 async function loadProject(){
  try{const db=await projectDB(),data=await new Promise((resolve,reject)=>{const request=db.transaction('projects').objectStore('projects').get('current');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});db.close();if(!data)throw Error('저장된 프로젝트가 없습니다.');
  stopTimeline();const old=state.clips;state.clips=[];old.forEach(releaseClip);state.audios.forEach(a=>URL.revokeObjectURL(a.url));for(const el of mediaCache.values()){el.pause?.();audioNodes.get(el)?.source.disconnect();audioNodes.get(el)?.gain.disconnect();el.removeAttribute('src');el.load?.();}mediaCache.clear();
- state.clips=data.clips.map(c=>({...c,url:URL.createObjectURL(c.blob)}));state.audios=data.audios.map(a=>({...a,url:URL.createObjectURL(a.blob)}));state.objects=data.objects;state.selected=state.clips.length?0:-1;canvas.width=data.canvasW;canvas.height=data.canvasH;renderTrack();draw();showInspector('media');toast('저장 프로젝트와 원본 미디어를 복구했습니다.');
+ state.clips=data.clips.map(c=>({...c,url:URL.createObjectURL(c.blob)}));state.audios=data.audios.map(a=>({...a,url:URL.createObjectURL(a.blob)}));state.objects=(data.objects||[]).map(o=>({...o,id:o.id||uid()}));state.selectedObject=null;state.selected=state.clips.length?0:-1;canvas.width=data.canvasW;canvas.height=data.canvasH;renderTrack();draw();showInspector('media');toast('저장 프로젝트와 원본 미디어를 복구했습니다.');
  }catch(error){toast('복구 실패: '+error.message);}
 }
 async function exportVideo(){
  if(exporting)return;if(!state.clips.length)return toast('먼저 영상을 추가하세요.');
  if(!canvas.captureStream||!window.MediaRecorder)return toast('이 브라우저는 영상 내보내기를 지원하지 않습니다.');
- exporting=true;let stream,rec,destination;
+ exporting=true;state.selectedObject=null;let stream,rec,destination;
  const locks=[...document.querySelectorAll('button,input,select')].map(el=>({el,disabled:el.disabled}));locks.forEach(({el})=>el.disabled=true);
  try{
   const context=ensureEditAudio();destination=context.createMediaStreamDestination();stream=canvas.captureStream(30);destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
