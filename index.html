@@ -24,7 +24,7 @@
 </header>
 
 <div class="app">
-<aside>
+<aside aria-label="편집 도구">
   <div class="sectionTitle">미디어</div>
   <button class="tool active" data-tool="media">🎬 미디어</button>
   <button class="tool" data-tool="text">🔤 텍스트</button>
@@ -43,7 +43,7 @@
   <button class="tool" onclick="moveClip(1)">▶ 순서 뒤로</button>
 </aside>
 
-<main class="workspace">
+<main class="workspace"><h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">Formwheel Edit</h1>
   <div class="stageWrap">
     <canvas id="canvas" width="720" height="1280"></canvas>
     <div id="empty" class="empty"><b>FormWheel_Edit</b>영상을 추가해서 편집을 시작하세요.</div>
@@ -61,11 +61,11 @@
   </div>
 </main>
 
-<aside class="right">
+<aside class="right" aria-label="편집 설정">
   <div id="inspector"></div>
 </aside>
 </div>
-<div id="toast" class="toast"></div>
+<div id="toast" role="status" aria-live="polite" class="toast"></div>
 
 <script src="./assets/app.js"></script>
 <script type="module" src="https://semicolonxss.github.io/Formwheel/assets/live-presence.js?v=20261017-duration"></script>
